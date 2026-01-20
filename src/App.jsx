@@ -4,6 +4,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 // [1] 토스 페이먼츠 SDK 임포트
 import { loadTossPayments } from '@tosspayments/payment-sdk';
 
+// [NEW] 약관 페이지 임포트
+import TermsOfUse from './pages/TermsOfUse';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import RefundPolicy from './pages/RefundPolicy';
+
 import { 
   Sparkles, Briefcase, Video, ChevronRight, 
   BarChart3, Zap, Database, Search, Bell, Menu, 
@@ -66,9 +71,9 @@ const HexagonRadar = ({ data, isManager }) => {
 };
 
 // =================================================================================
-// [2] Footer 컴포넌트 (최적화 완료: 더 작고 컴팩트하게)
+// [2] Footer 컴포넌트 (수정됨: onNavigate Prop 추가)
 // =================================================================================
-const Footer = ({ theme = 'light' }) => {
+const Footer = ({ theme = 'light', onNavigate }) => {
   const isDark = theme === 'dark';
   return (
     <div className={`py-4 px-6 text-[9px] leading-tight border-t text-left ${isDark ? 'bg-gray-900 text-gray-500 border-gray-800' : 'bg-gray-100 text-gray-400 border-gray-200'}`}>
@@ -82,9 +87,10 @@ const Footer = ({ theme = 'light' }) => {
         <span>고객센터: 02-1234-5678 (cs@kim-manager.com)</span>
       </div>
       <div className="flex gap-3 font-bold opacity-80 cursor-pointer">
-        <span>이용약관</span>
-        <span>개인정보처리방침</span>
-        <span>환불규정</span>
+        {/* [NEW] 클릭 이벤트 연결 */}
+        <span onClick={() => onNavigate && onNavigate('terms')}>이용약관</span>
+        <span onClick={() => onNavigate && onNavigate('privacy')}>개인정보처리방침</span>
+        <span onClick={() => onNavigate && onNavigate('refund')} className="hover:text-red-500 transition-colors">환불규정</span>
       </div>
       <p className="mt-2 opacity-50">Copyright © 2026 NAMU COMPANY All rights reserved.</p>
     </div>
@@ -183,7 +189,7 @@ function App() {
       // 결제 성공 파라미터가 있으면 처리
       alert("결제 성공! Pro 등급으로 전환됩니다.");
       setIsPro(true);
-      setCurrentScreen('home');
+      setCurrentScreen('home'); // [수정됨] 결제 후 홈으로 이동
       // URL 파라미터 초기화 (새로고침 시 중복 실행 방지)
       window.history.replaceState({}, document.title, window.location.pathname);
     } else if (urlParams.get('code')) {
@@ -518,7 +524,7 @@ function App() {
               
               {/* [Footer] 다크 테마 */}
               <div className="w-full">
-                <Footer theme="dark" />
+                <Footer theme="dark" onNavigate={setCurrentScreen} />
               </div>
             </div>
           </motion.div>
@@ -562,7 +568,8 @@ function App() {
                 </div>
               </div>
             </div>
-            <Footer theme="light" />
+            {/* Footer에 onNavigate 연결 */}
+            <Footer theme="light" onNavigate={setCurrentScreen} />
           </motion.div>
         )}
 
@@ -679,7 +686,8 @@ function App() {
                 )}
               </div>
             </div>
-            <Footer theme="light" />
+            {/* Footer에 onNavigate 연결 */}
+            <Footer theme="light" onNavigate={setCurrentScreen} />
           </motion.div>
         )}
 
@@ -750,6 +758,24 @@ function App() {
         {currentScreen === 'generating' && (<motion.div key="generating" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex h-full w-full flex-col items-center justify-center bg-white px-6 text-center"><div className={`relative mb-8 flex h-24 w-24 items-center justify-center rounded-full bg-gray-50`}><Sparkles className={`h-10 w-10 animate-pulse ${themeColor}`} /><motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 3, ease: "linear" }} className={`absolute inset-0 rounded-full border-t-2 ${isManager ? 'border-indigo-500' : 'border-pink-500'}`}/></div><h2 className="mb-2 text-xl font-bold text-gray-900">AI가 글을 쓰고 있어요</h2><p className="text-sm text-gray-500">"{contentTopic}" 주제로<br/>가장 반응이 좋은 톤앤매너를 찾는 중...</p></motion.div>)}
         {currentScreen === 'result' && (<motion.div key="result" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="flex h-full flex-col bg-gray-50"><div className="flex items-center justify-between px-6 pt-8 pb-4 bg-white sticky top-0 z-10"><button onClick={() => setCurrentScreen('home')} className="rounded-full bg-gray-50 p-2 hover:bg-gray-100"><X size={20} className="text-gray-600" /></button><div className="font-bold text-lg text-gray-900">생성 결과</div><button onClick={handleSaveResult} className={`font-bold ${themeColor}`}>저장</button></div><div className="flex-1 overflow-y-auto px-6 pb-24"><motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.2 }} className={`mt-4 mb-6 rounded-2xl p-5 border shadow-sm transition-all ${isApplied ? 'bg-green-50 border-green-200' : 'bg-blue-50 border-blue-100'}`}>{!isApplied ? (<div className="flex gap-3"><div className="flex-shrink-0 rounded-full bg-blue-100 p-2 text-blue-600 h-fit"><Sparkles size={18} /></div><div className="flex-1"><h4 className="font-bold text-blue-800 text-sm mb-1">{partnerName}의 Tip</h4><p className="text-xs text-blue-600 leading-relaxed mb-3">{isManager ? <>사장님! <strong>'{contentTopic}'</strong> 대신 <strong>'{contentTopic} 추천'</strong>으로 새로 쓰면 클릭률이 15% 더 <strong>올라갈 수 있어요!</strong></> : <>PD님! 도입부 3초에 <strong>'이거 모르면 손해'</strong>를 새로 쓰면 시청 지속 시간이 2배 <strong>늘어날 수 있어요!</strong></>}</p><button onClick={handleApplyAdvice} className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-md shadow-blue-200 active:scale-95 transition-transform">{isPro ? '네, 수정해주세요' : '네, 수정해주세요 (Pro)'} <ArrowRight size={12} /></button></div></div>) : (<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center justify-between"><div className="flex items-center gap-2.5"><div className="rounded-full bg-green-100 p-1.5 text-green-600"><CheckCircle2 size={16} /></div><span className="text-sm font-bold text-green-700">성공적으로 반영했어요!</span></div><button onClick={() => setIsApplied(false)} className="text-xs text-gray-400 underline">되돌리기</button></motion.div>)}</motion.div><div className="mb-6 flex rounded-xl bg-gray-200 p-1">{tabs.map((tab) => (<button key={tab.id} onClick={() => setResultTab(tab.id)} className={`flex-1 flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-bold transition-all ${resultTab === tab.id ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}><tab.icon size={16}/> {tab.label}</button>))}</div><div className="relative rounded-[24px] bg-white p-6 shadow-xl shadow-gray-100 overflow-hidden">{isApplied && <motion.div initial={{ opacity: 0.5 }} animate={{ opacity: 0 }} transition={{ duration: 1 }} className="absolute inset-0 bg-green-400 mix-blend-overlay pointer-events-none z-10"/>}{isManager ? (<>{resultTab === 'blog' && (<div className="space-y-4"><div className="border-b border-gray-100 pb-3"><span className="text-xs font-bold text-green-500 mb-1 block">NAVER BLOG</span><h3 className="text-lg font-bold text-gray-900 leading-snug">{isApplied ? `🚨 ${formData.location} ${contentTopic} 종결자! 사장님이 미쳤어요 😲` : `${formData.location} ${contentTopic} 솔직 후기! (feat. 사장님 추천)`}</h3></div><div className="space-y-3 text-sm text-gray-600 leading-relaxed">{isApplied ? <><p><strong>"아직도 여기 안 가보셨어요?"</strong></p><p>솔직히 말씀드릴게요. {formData.location}에서...</p></> : <><p>안녕하세요! 여러분 😊</p><p>오늘은 비도 오고 해서...</p></>}</div></div>)}{resultTab === 'insta' && (<div className="space-y-4"><div className="flex items-center justify-between border-b border-gray-100 pb-3"><div className="flex items-center gap-2"><div className="h-8 w-8 rounded-full bg-gradient-to-tr from-yellow-400 to-pink-600 p-[2px]"><div className="h-full w-full rounded-full bg-white p-[2px]"><div className="h-full w-full rounded-full bg-gray-200" /></div></div><span className="font-bold text-sm text-gray-900">{formData.nickname || 'manager'}</span></div><MoreHorizontal size={20} className="text-gray-400" /></div><div className={`relative flex aspect-square w-full items-center justify-center overflow-hidden rounded-xl transition-all duration-500 ${isApplied ? 'bg-gradient-to-br from-purple-600 to-pink-500' : 'bg-gray-100'}`}>{!isApplied && <ImageIcon size={48} className="text-gray-300" />}<div className="absolute inset-0 flex items-center justify-center p-6 text-center"><h3 className={`text-2xl font-black drop-shadow-lg leading-tight break-keep ${isApplied ? 'text-white' : 'text-gray-800'}`}>{isApplied ? <>🚨 사장님이 미쳤어요!<br/><span className="text-yellow-300">{contentTopic}</span> 반값 할인</> : <>{formData.location}<br/>{contentTopic} 맛집 추천</>}</h3></div></div><div className="flex justify-between text-gray-800"><div className="flex gap-4"><Heart /><MessageCircle /><Send /></div><Bookmark /></div><div className="text-sm text-gray-800 leading-relaxed"><p className="mb-1"><span className="font-bold mr-2">{formData.nickname || 'manager'}</span>{isApplied ? "이거 모르면 진짜 손해...😱" : "비 오는 날엔 역시 이거지! ☔️✨"}</p></div><div className="text-blue-600 text-sm">#{formData.location} #{contentTopic} {isApplied && "#사장님이미쳤어요 #이벤트"}</div></div>)}</>) : (<>{resultTab === 'conti' && (<div className="space-y-6"><div className="border-l-4 border-pink-500 pl-4"><span className="text-xs font-bold text-pink-500 block mb-1">Scene 1: 3초 후킹</span><p className="text-sm font-bold text-gray-900">{isApplied ? "\"이거 모르면 100만원 손해봅니다!\"" : "\"오늘 대박 소식 알려드립니다!\""}</p><p className="text-xs text-gray-400 mt-1">🎬 화면: 클로즈업 + 자막 크게</p></div><div className="border-l-4 border-gray-200 pl-4"><span className="text-xs font-bold text-gray-400 block mb-1">Scene 2: 문제 제기</span><p className="text-sm font-bold text-gray-900">{contentTopic}의 충격적인 진실 공개</p></div><div className="border-l-4 border-gray-200 pl-4"><span className="text-xs font-bold text-gray-400 block mb-1">Scene 3: 해결책</span><p className="text-sm font-bold text-gray-900">댓글 링크에서 확인하세요!</p></div></div>)}{resultTab === 'title' && (<div className="space-y-4"><div className="space-y-2"><label className="text-xs font-bold text-gray-400">추천 제목 3종</label>{[1,2,3].map(i => <div key={i} className="bg-gray-50 p-3 rounded-xl text-sm font-bold text-gray-800 border border-gray-100 flex justify-between"><span>{i}. {isApplied ? `클릭하면 무조건 이득! ${contentTopic}` : `${contentTopic} 솔직 리뷰`}</span><Copy size={14} className="text-gray-300"/></div>)}</div></div>)}</>)}</div><div className="mt-6 flex gap-3"><button className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-gray-100 py-3.5 text-sm font-bold text-gray-700 hover:bg-gray-200"><Copy size={18} /> 복사하기</button><button className={`flex-1 flex items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-bold text-white ${bgTheme}`}><Share2 size={18} /> 공유하기</button></div><p className="mt-4 text-center text-xs text-gray-400">💡 저장을 누르셔야 AI가 사장님 스타일을 학습해<br/>다음번에 더 완벽한 글을 씁니다!</p></div></motion.div>)}
         {currentScreen === 'notification' && (<motion.div key="notification" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className="flex h-full w-full flex-col bg-gray-50"><div className="flex items-center gap-3 bg-white px-6 pt-8 pb-4 sticky top-0 z-10 border-b border-gray-100"><button onClick={() => setCurrentScreen('home')} className="rounded-full bg-gray-50 p-2 hover:bg-gray-100"><ArrowRight className="rotate-180" size={20} /></button><h2 className="text-lg font-bold text-gray-900">알림 센터</h2></div><div className="flex-1 overflow-y-auto px-6 py-6 space-y-4"><div className="flex gap-4 rounded-2xl bg-white p-4 shadow-sm border border-red-50"><div className="flex-shrink-0 mt-1 text-red-500"><AlertTriangle size={20} /></div><div><h4 className="font-bold text-gray-900 text-sm mb-1">부정 리뷰 감지 🚨</h4><p className="text-xs text-gray-600 leading-relaxed">{isManager ? "옆집 A가게에 '불친절' 키워드가 포함된 리뷰가 등록되었습니다." : "경쟁 채널 B에 '광고 너무 많음' 댓글이 급증하고 있습니다."}</p><span className="text-[10px] text-gray-400 mt-2 block">1시간 전</span></div></div><div className="flex gap-4 rounded-2xl bg-white p-4 shadow-sm border border-blue-50"><div className="flex-shrink-0 mt-1 text-blue-500"><TrendingDown size={20} /></div><div><h4 className="font-bold text-gray-900 text-sm mb-1">가격/트렌드 변동 📉</h4><p className="text-xs text-gray-600 leading-relaxed">{isManager ? "B가게가 김치찌개 가격을 1,000원 인하했습니다." : "먹방 카테고리 시청 지속 시간이 소폭 하락했습니다."}</p><span className="text-[10px] text-gray-400 mt-2 block">3시간 전</span></div></div><div className="flex gap-4 rounded-2xl bg-white p-4 shadow-sm border border-purple-50"><div className="flex-shrink-0 mt-1 text-purple-500"><Zap size={20} /></div><div><h4 className="font-bold text-gray-900 text-sm mb-1">실시간 트렌드 🔥</h4><p className="text-xs text-gray-600 leading-relaxed">지금 유튜브에서 '탕후루' 챌린지가 다시 뜨고 있습니다! 탑승하시겠습니까?</p><span className="text-[10px] text-gray-400 mt-2 block">5시간 전</span></div></div></div></motion.div>)}
+
+        {/* [NEW] 약관 페이지 3종 (조건부 렌더링) */}
+        {currentScreen === 'terms' && (
+          <motion.div key="terms" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className="absolute inset-0 z-50 bg-white">
+            <TermsOfUse onBack={() => setCurrentScreen('home')} />
+          </motion.div>
+        )}
+        {currentScreen === 'privacy' && (
+          <motion.div key="privacy" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className="absolute inset-0 z-50 bg-white">
+            <PrivacyPolicy onBack={() => setCurrentScreen('home')} />
+          </motion.div>
+        )}
+        {currentScreen === 'refund' && (
+          <motion.div key="refund" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className="absolute inset-0 z-50 bg-white">
+            <RefundPolicy onBack={() => setCurrentScreen('home')} />
+          </motion.div>
+        )}
+
       </AnimatePresence>
     </MobileLayout>
   );
