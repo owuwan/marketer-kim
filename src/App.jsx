@@ -183,7 +183,7 @@ function App() {
       // 결제 성공 파라미터가 있으면 처리
       alert("결제 성공! Pro 등급으로 전환됩니다.");
       setIsPro(true);
-      setCurrentScreen('result');
+      setCurrentScreen('home');
       // URL 파라미터 초기화 (새로고침 시 중복 실행 방지)
       window.history.replaceState({}, document.title, window.location.pathname);
     } else if (urlParams.get('code')) {
