@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import MobileLayout from './components/MobileLayout';
 import { motion, AnimatePresence } from 'framer-motion';
-// ★ [중요] 아이콘 리스트 100% 유지
+// [1] 토스 페이먼츠 SDK 임포트
+import { loadTossPayments } from '@tosspayments/payment-sdk';
+
 import { 
   Sparkles, Briefcase, Video, ChevronRight, 
   BarChart3, Zap, Database, Search, Bell, Menu, 
@@ -24,7 +26,7 @@ const HexagonRadar = ({ data, isManager }) => {
   const center = size / 2;
   const radius = 70;
   const angles = [-90, -30, 30, 90, 150, 210].map(a => a * (Math.PI / 180));
-  
+   
   const safeData = (data && data.length === 6) ? data : [0.5, 0.5, 0.5, 0.5, 0.5, 0.5];
 
   const dataPoints = angles.map((a, i) => {
@@ -54,9 +56,9 @@ const HexagonRadar = ({ data, isManager }) => {
       </svg>
       {labels.map((label, i) => (
          <div key={i} className="absolute text-[10px] font-bold text-gray-500" style={{
-            top: `${50 + 50 * Math.sin(angles[i])}%`,
-            left: `${50 + 50 * Math.cos(angles[i])}%`,
-            transform: 'translate(-50%, -50%)'
+           top: `${50 + 50 * Math.sin(angles[i])}%`,
+           left: `${50 + 50 * Math.cos(angles[i])}%`,
+           transform: 'translate(-50%, -50%)'
          }}>{label}</div>
       ))}
     </div>
@@ -64,24 +66,27 @@ const HexagonRadar = ({ data, isManager }) => {
 };
 
 // =================================================================================
-// [2] Footer 컴포넌트 (토스 심사 필수, 좌측 정렬)
+// [2] Footer 컴포넌트 (최적화 완료: 더 작고 컴팩트하게)
 // =================================================================================
 const Footer = ({ theme = 'light' }) => {
   const isDark = theme === 'dark';
   return (
-    <div className={`py-8 px-6 text-[10px] leading-relaxed border-t text-left ${isDark ? 'bg-gray-900 text-gray-500 border-gray-800' : 'bg-gray-100 text-gray-400 border-gray-200'}`}>
-      <div className="font-bold mb-2 text-xs">나무컴퍼니 | 대표: 최하나</div>
-      <div className="space-y-1">
-        <p>사업자등록번호: 476-24-00343 | 통신판매업: 2016-인천서구-0890</p>
-        <p>주소: 경기도 김포시 양촌읍 누산봉성로53번길 74</p>
-        <p>고객센터: 02-1234-5678 | cs@kim-manager.com</p>
+    <div className={`py-4 px-6 text-[9px] leading-tight border-t text-left ${isDark ? 'bg-gray-900 text-gray-500 border-gray-800' : 'bg-gray-100 text-gray-400 border-gray-200'}`}>
+      <div className="font-bold mb-1 text-[10px]">나무컴퍼니 | 대표: 최하나</div>
+      {/* 정보 압축 및 한 줄 표시 */}
+      <div className="flex flex-wrap gap-x-2 gap-y-0.5 opacity-80 mb-2">
+        <span>사업자등록번호: 476-24-00343</span>
+        <span className="text-gray-300">|</span>
+        <span>통신판매업: 2016-인천서구-0890</span>
+        <span className="w-full">주소: 경기도 김포시 양촌읍 누산봉성로53번길 74</span>
+        <span>고객센터: 02-1234-5678 (cs@kim-manager.com)</span>
       </div>
-      <div className="mt-4 flex gap-3 font-bold opacity-80 cursor-pointer">
+      <div className="flex gap-3 font-bold opacity-80 cursor-pointer">
         <span>이용약관</span>
         <span>개인정보처리방침</span>
         <span>환불규정</span>
       </div>
-      <p className="mt-4 opacity-50">Copyright © 2024 NAMU COMPANY All rights reserved.</p>
+      <p className="mt-2 opacity-50">Copyright © 2026 NAMU COMPANY All rights reserved.</p>
     </div>
   );
 };
@@ -104,7 +109,7 @@ function App() {
     rivalChannel: '', keywords: '', targetAudience: '',
     naverLink: '', instaId: '', channelLink: ''
   });
-  
+   
   const [chatMessages, setChatMessages] = useState([]);
   const [chatStep, setChatStep] = useState(0); 
   const [inputText, setInputText] = useState('');
@@ -118,7 +123,7 @@ function App() {
   const [contentTopic, setContentTopic] = useState('');
   const [refLink, setRefLink] = useState(''); 
   const [selectedMood, setSelectedMood] = useState('자극적인'); 
-  
+   
   // Modals & Tabs
   const [showGuideModal, setShowGuideModal] = useState(false);
   const [showPaywallModal, setShowPaywallModal] = useState(false);
@@ -146,16 +151,53 @@ function App() {
     ? [ { id: 'blog', label: '블로그', icon: FileText }, { id: 'insta', label: '인스타', icon: Instagram } ]
     : [ { id: 'conti', label: '숏폼 콘티', icon: Film }, { id: 'title', label: '썸네일·제목', icon: Type } ];
 
+  // --- [NEW] 토스 결제 핸들러 ---
+  const handlePayment = async () => {
+    try {
+      const clientKey = "test_ck_ZLKGPx4M3Mq5qLeqWEXe3BaWypv1"; // 사장님 전용 테스트 키
+      const tossPayments = await loadTossPayments(clientKey);
+      
+      // 결제 요청
+      await tossPayments.requestPayment('카드', {
+        amount: 50000,
+        orderId: `ORD-${Date.now()}`, // 고유 주문번호 생성
+        orderName: "마케터 김과장 Pro (월간 구독)",
+        successUrl: window.location.href, // 성공 시 현재 페이지로 리다이렉트 (useEffect에서 처리)
+        failUrl: window.location.href,    // 실패 시 현재 페이지로 리다이렉트
+      });
+    } catch (error) {
+      if (error.code === 'USER_CANCEL') {
+        alert("결제가 취소되었습니다.");
+      } else {
+        alert(`결제 실패: ${error.message}`);
+      }
+    }
+  };
+
+  // --- [NEW] 결제 성공 리다이렉트 처리 ---
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const paymentKey = urlParams.get('paymentKey');
+
+    if (paymentKey) {
+      // 결제 성공 파라미터가 있으면 처리
+      alert("결제 성공! Pro 등급으로 전환됩니다.");
+      setIsPro(true);
+      setCurrentScreen('result');
+      // URL 파라미터 초기화 (새로고침 시 중복 실행 방지)
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (urlParams.get('code')) {
+      // 결제 실패 파라미터
+      alert("결제가 취소되었습니다.");
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
+
+
   // --- Handlers ---
   const handleApplyAdvice = () => {
     if (isPro) setIsApplied(true);
     else setShowPaywallModal(true);
-  };
-
-  const handleSubscribe = () => {
-    setIsPro(true);
-    alert("🎉 Pro 멤버십에 가입되었습니다! 이제 모든 기능을 제한 없이 이용하세요.");
-    setCurrentScreen('result');
   };
 
   const handleCounterAttack = (targetName, reason) => {
@@ -242,7 +284,7 @@ function App() {
     if (currentScreen === 'upload') setShowGuideModal(true);
   }, [currentScreen]);
 
-  // --- Chat Logic (인터뷰 로직 복구) ---
+  // --- Chat Logic (인터뷰 로직) ---
   const addSystemMessage = (step, immediateValue = null) => {
     setIsTyping(true);
     const val = immediateValue; 
@@ -351,7 +393,7 @@ function App() {
               <button onClick={() => { setIsSidebarOpen(false); setCurrentScreen('customerCenter'); }} className="flex w-full items-center gap-3 rounded-xl p-3 text-gray-700 hover:bg-gray-50"><HelpCircle size={20} className="text-gray-400" /> <span className="font-medium">고객센터</span></button>
               <div className="my-2 h-px bg-gray-100" />
               <button onClick={() => { setIsSidebarOpen(false); setCurrentScreen('splash'); }} className="flex w-full items-center gap-3 rounded-xl p-3 text-red-500 hover:bg-red-50"><LogOut size={20} /> <span className="font-medium">로그아웃</span></button>
-              <div className="mt-8 border-t border-dashed border-gray-200 pt-4"><p className="px-3 text-[10px] font-bold text-gray-400 mb-2">DEVELOPER OPTIONS</p><button onClick={() => setIsPro(!isPro)} className="flex w-full items-center justify-between gap-3 rounded-xl bg-gray-50 p-3 text-gray-600 hover:bg-gray-100"><span className="text-xs font-bold">[Dev] Pro 모드</span><div className={`relative h-5 w-9 rounded-full transition-colors ${isPro ? 'bg-green-500' : 'bg-gray-300'}`}><div className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white transition-transform ${isPro ? 'translate-x-4' : ''}`} /></div></button></div>
+              <div className="mt-8 border-t border-dashed border-gray-200 pt-4"><p className="px-3 text-[10px] font-bold text-gray-400 mb-2">DEVELOPER OPTIONS</p><button onClick={() => setIsPro(!isPro)} className="flex w-full items-center justify-between gap-3 rounded-xl bg-gray-50 p-3 text-gray-600 hover:bg-gray-100"><span className="text-xs font-bold">[Dev] Pro 모드 강제전환</span><div className={`relative h-5 w-9 rounded-full transition-colors ${isPro ? 'bg-green-500' : 'bg-gray-300'}`}><div className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white transition-transform ${isPro ? 'translate-x-4' : ''}`} /></div></button></div>
             </div>
           </motion.div>
         </>
@@ -368,7 +410,7 @@ function App() {
           </motion.div>
         )}
 
-        {/* Screen 2: Onboarding (푸터 삭제) */}
+        {/* Screen 2: Onboarding */}
         {currentScreen === 'onboarding' && (
           <motion.div key="onboarding" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: -50 }} className="flex h-full w-full flex-col px-6 pt-12 pb-8">
             <div className="mb-8"><span className="mb-3 inline-block rounded-full bg-indigo-100 px-3 py-1 text-xs font-bold text-indigo-600">AI 파트너 매칭</span><h2 className="text-2xl font-bold text-gray-900 leading-snug">어떤 파트너가<br />필요하신가요?</h2></div>
@@ -407,7 +449,6 @@ function App() {
                      {isManager ? (
                        <div className="relative flex-1"><div className="absolute left-3 top-3 text-green-500 font-bold text-xs">N</div><input value={snsInput.naver} onChange={(e)=>setSnsInput({...snsInput, naver:e.target.value})} placeholder="네이버 플레이스 링크" className="w-full rounded-xl bg-gray-50 py-3 pl-8 pr-3 text-sm outline-none focus:bg-white focus:ring-2 focus:ring-green-100 transition-all"/></div>
                      ) : (
-                       // 1. 크리에이터 인터뷰 수정: 활동중인 채널 링크
                        <div className="relative flex-1"><div className="absolute left-3 top-3 text-pink-500 font-bold text-xs">CH</div><input value={snsInput.channel} onChange={(e)=>setSnsInput({...snsInput, channel:e.target.value})} placeholder="활동중인 채널 링크" className="w-full rounded-xl bg-gray-50 py-3 pl-8 pr-3 text-sm outline-none focus:bg-white focus:ring-2 focus:ring-pink-100 transition-all"/></div>
                      )}
                      <div className="relative flex-1"><div className="absolute left-3 top-3 text-pink-500 font-bold text-xs">IG</div><input value={snsInput.insta} onChange={(e)=>setSnsInput({...snsInput, insta:e.target.value})} placeholder="인스타 아이디" className="w-full rounded-xl bg-gray-50 py-3 pl-8 pr-3 text-sm outline-none focus:bg-white focus:ring-2 focus:ring-pink-100 transition-all"/></div>
@@ -442,7 +483,7 @@ function App() {
           </motion.div>
         )}
 
-        {/* Subscription Screen (Updated: Scrollable with Footer & Back Button) */}
+        {/* Subscription Screen */}
         {currentScreen === 'subscription' && (
           <motion.div key="subscription" initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} className="flex h-full w-full flex-col bg-gray-900 overflow-y-auto relative">
             <div className="absolute top-0 left-0 w-full p-6 z-50 pointer-events-none">
@@ -471,7 +512,8 @@ function App() {
                   </div>
                   <div className="rounded-xl bg-red-100 px-4 py-2 text-sm font-bold text-red-600">58% OFF</div>
                 </div>
-                <button onClick={handleSubscribe} className={`w-full rounded-2xl py-4 text-lg font-bold text-white shadow-xl active:scale-95 transition-transform bg-gradient-to-r from-indigo-600 to-purple-600`}>지금 바로 시작하기</button>
+                {/* [NEW] 결제 버튼에 토스 연동 핸들러 적용 */}
+                <button onClick={handlePayment} className={`w-full rounded-2xl py-4 text-lg font-bold text-white shadow-xl active:scale-95 transition-transform bg-gradient-to-r from-indigo-600 to-purple-600`}>[토스 페이먼츠로 3초 결제]</button>
               </div>
               
               {/* [Footer] 다크 테마 */}
@@ -482,12 +524,11 @@ function App() {
           </motion.div>
         )}
 
-        {/* Customer Center (Updated: Restored Lists & Added Footer) */}
+        {/* Customer Center */}
         {currentScreen === 'customerCenter' && (
           <motion.div key="customerCenter" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className="flex h-full w-full flex-col bg-white">
             <div className="flex items-center gap-3 px-6 pt-8 pb-4 sticky top-0 z-10 bg-white border-b border-gray-100"><button onClick={() => setCurrentScreen('home')} className="rounded-full bg-gray-50 p-2 hover:bg-gray-100"><ArrowRight className="rotate-180" size={20} /></button><h2 className="text-lg font-bold text-gray-900">고객센터</h2></div>
             <div className="flex-1 p-6 overflow-y-auto">
-              {/* 문의 작성 폼 */}
               <div className="mb-8">
                 <h3 className="text-sm font-bold text-gray-900 mb-3">1:1 문의 작성</h3>
                 <div className="space-y-3">
@@ -503,7 +544,6 @@ function App() {
               
               <div className="h-px bg-gray-100 my-6" />
 
-              {/* [복구] 문의 내역 */}
               <div className="mb-8">
                 <div className="flex items-center justify-between mb-3"><h3 className="text-sm font-bold text-gray-900">최근 문의 내역</h3><span className="text-xs text-gray-400">전체보기</span></div>
                 <div className="space-y-2">
@@ -512,7 +552,6 @@ function App() {
                 </div>
               </div>
 
-              {/* [복구] FAQ */}
               <div>
                 <h3 className="text-sm font-bold text-gray-900 mb-3">자주 묻는 질문</h3>
                 <div className="space-y-3">
@@ -523,24 +562,21 @@ function App() {
                 </div>
               </div>
             </div>
-            {/* [추가] 고객센터 하단 푸터 */}
             <Footer theme="light" />
           </motion.div>
         )}
 
-        {/* Brand DNA Screen (Updated Warning + Restored Competitor Spy List) */}
+        {/* Brand DNA Screen */}
         {currentScreen === 'brandDNA' && (
           <motion.div key="brandDNA" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className="flex h-full w-full flex-col bg-white">
             <div className="flex items-center gap-3 px-6 pt-8 pb-4 sticky top-0 z-10 bg-white border-b border-gray-100"><button onClick={() => setCurrentScreen('home')} className="rounded-full bg-white p-2 hover:bg-gray-100 shadow-sm"><ArrowRight className="rotate-180" size={20} /></button><h2 className="text-lg font-bold text-gray-900">브랜드 DNA 관리</h2></div>
             
-            {/* 안내 배너 */}
             <div className="bg-blue-50 px-6 py-3 border-b border-blue-100 flex items-start gap-3">
               <div className="mt-0.5"><Database size={16} className="text-blue-600"/></div>
               <p className="text-xs text-blue-700 leading-relaxed"><strong>💡 생성된 콘텐츠를 [저장]해야<br/>우리 가게의 DNA 데이터로 분석됩니다.</strong></p>
             </div>
 
             <div className="flex-1 overflow-y-auto px-6 py-6">
-              {/* 1. Radar Chart Section */}
               <div className="mb-6 rounded-[32px] bg-white p-6 shadow-xl shadow-gray-100 border border-gray-100">
                 <div className="mb-4 flex items-center justify-between"><div className="flex items-center gap-2"><div className={`rounded-full p-1.5 ${isManager ? 'bg-indigo-100 text-indigo-600' : 'bg-pink-100 text-pink-600'}`}><BarChart3 size={16} /></div><span className="text-sm font-bold text-gray-600">마케팅 건강검진</span></div><span className="rounded-full bg-green-100 px-2.5 py-1 text-[10px] font-bold text-green-600">78점 (양호)</span></div>
                 <HexagonRadar data={[0.9, 0.4, 0.8, 0.7, 0.85, 0.6]} isManager={isManager} />
@@ -551,20 +587,16 @@ function App() {
                 </div>
               </div>
 
-              {/* 2. [복구] 감시 중인 경쟁사 (버튼 포함) */}
               <div className="mb-8">
                 <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2"><Target size={20} className={themeColor}/> 감시 중인 경쟁사</h3>
                 <div className="space-y-3">
                   {['옆집 돈까스', '청담 김밥', '메가 커피', '빽다방', '공차'].map((name, i) => (<div key={i} className="flex items-center justify-between rounded-xl bg-gray-50 p-4"><div className="flex items-center gap-3"><Store size={18} className="text-gray-400"/><span className="font-bold text-gray-700">{name}</span></div><span className="rounded-md bg-green-100 px-2 py-1 text-[10px] font-bold text-green-600">감시 중</span></div>))}
-                  {/* [복구] 경쟁사 추가 버튼 */}
                   <button onClick={() => setCurrentScreen('subscription')} className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-200 p-4 text-sm font-bold text-gray-400 hover:border-gray-400 hover:text-gray-600">+ 경쟁사 추가하기</button>
                 </div>
               </div>
 
-              {/* 3. 나의 키워드 영토 */}
               <div className="mb-8"><h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2"><MapPin size={20} className={themeColor}/> 나의 키워드 영토</h3><div className="flex flex-wrap gap-2">{['#부평맛집', '#데이트', '#가성비', '#존맛탱', '#분위기좋은'].map((tag, i) => (<span key={i} className={`rounded-full px-3 py-1.5 text-xs font-bold ${i < 2 ? `${bgTheme} text-white` : 'bg-gray-100 text-gray-600'}`}>{tag}</span>))}</div></div>
               
-              {/* 4. NEW: Data Asset Value Report (White Style) */}
               <div className="mb-8 rounded-[32px] bg-white p-8 shadow-xl shadow-blue-50 border border-blue-100 relative overflow-hidden">
                 <div className="absolute top-0 right-0 p-6 opacity-5"><Database size={120} className="text-blue-600"/></div>
                 <div className="relative z-10 mb-8">
@@ -609,7 +641,7 @@ function App() {
           </motion.div>
         )}
 
-        {/* My Account (With Footer) */}
+        {/* My Account */}
         {currentScreen === 'myAccount' && (
           <motion.div key="myAccount" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className="flex h-full w-full flex-col bg-white">
             <div className="flex items-center gap-3 px-6 pt-8 pb-4 sticky top-0 z-10 bg-white border-b border-gray-100"><button onClick={() => setCurrentScreen('home')} className="rounded-full bg-gray-50 p-2 hover:bg-gray-100"><ArrowRight className="rotate-180" size={20} /></button><h2 className="text-lg font-bold text-gray-900">내 계정 정보</h2></div>
@@ -626,7 +658,6 @@ function App() {
                 <p className="mt-2 text-[10px] text-gray-400 text-right">매월 1일 초기화됩니다.</p>
               </div>
               
-              {/* 내 계정에 저장된 콘텐츠 리스트 추가 */}
               <div className="mt-8 pt-8 border-t border-gray-100">
                 <h3 className="text-sm font-bold text-gray-900 mb-1">📂 나의 저장 콘텐츠</h3>
                 <p className="text-xs text-gray-400 mb-4">데이터가 쌓일수록 김과장이 더 똑똑해집니다.</p>
@@ -648,7 +679,6 @@ function App() {
                 )}
               </div>
             </div>
-            {/* [Footer] 내 정보 하단 (라이트 테마) */}
             <Footer theme="light" />
           </motion.div>
         )}
@@ -656,7 +686,6 @@ function App() {
         {/* Home Screen */}
         {currentScreen === 'home' && (
           <motion.div key="home" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex h-full flex-col bg-gray-50">
-            {/* 상단 돋보기 삭제됨 */}
             <div className="flex items-center justify-between px-6 pt-8 pb-4 bg-white sticky top-0 z-10 shadow-sm shadow-gray-100/50"><div className={`font-bold text-lg ${themeColor}`}>Marketer Kim</div><div className="flex gap-4 text-gray-400"><Bell size={22} className="cursor-pointer hover:text-gray-600" onClick={() => setCurrentScreen('notification')} /><Menu size={22} className="cursor-pointer hover:text-gray-600" onClick={() => setIsSidebarOpen(true)} /></div></div>
             <div className="flex-1 overflow-y-auto px-6 pb-24">
               <div className="mt-6 mb-8"><h2 className="text-2xl font-bold text-gray-900 leading-tight mb-4">{isManager ? <>사장님, 우리 가게 앞에도<br/>줄을 세워볼까요? 🏃‍♂️🏃‍♀️</> : <>PD님, 알고리즘의<br/>간택을 받으러 가시죠! 🎬✨</>}</h2><button onClick={handleNormalUpload} className={`group relative flex h-32 w-full flex-col justify-between overflow-hidden rounded-[32px] p-7 text-white shadow-xl transition-transform active:scale-95 ${isManager ? 'bg-gradient-to-br from-indigo-600 to-blue-500 shadow-indigo-200' : 'bg-gradient-to-br from-pink-500 to-rose-400 shadow-pink-200'}`}><div className="relative z-10"><span className="block text-sm font-medium opacity-80 mb-1">AI 자동 생성</span><span className="text-2xl font-bold">콘텐츠 만들기 <ArrowRight className="inline ml-1" size={20}/></span></div><div className="absolute right-0 bottom-0 opacity-20"><Sparkles size={120} /></div></button></div>
