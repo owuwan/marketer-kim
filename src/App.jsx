@@ -20,8 +20,22 @@ import {
   LogOut, CreditCard, HelpCircle, ShieldAlert, Store, TrendingDown,
   Lock, Check, Crown, Link, Info, ExternalLink, Activity,
   GraduationCap, Eye, Brain, Palette, Mail, ChevronDown,
-  MousePointerClick, Layers, FileWarning, Bot, Eraser // Eraser 아이콘 추가
+  MousePointerClick, Layers, FileWarning, Bot, Eraser 
 } from 'lucide-react';
+
+// =================================================================================
+// [0] 유틸리티: 안전한 로컬 스토리지 파싱 함수 (데이터 증발 방지)
+// =================================================================================
+const getSafeLocalStorage = (key, defaultValue) => {
+  try {
+    const saved = localStorage.getItem(key);
+    if (!saved || saved === "undefined") return defaultValue;
+    return JSON.parse(saved);
+  } catch (error) {
+    console.error(`[Error] Failed to parse ${key} from localStorage:`, error);
+    return defaultValue;
+  }
+};
 
 // =================================================================================
 // [1] 육각형 차트 컴포넌트
@@ -79,11 +93,11 @@ const Footer = ({ theme = 'light', onNavigate }) => {
     <div className={`py-4 px-6 text-[9px] leading-tight border-t text-left ${isDark ? 'bg-gray-900 text-gray-500 border-gray-800' : 'bg-gray-100 text-gray-400 border-gray-200'}`}>
       <div className="font-bold mb-1 text-[10px]">나무컴퍼니 | 대표: 최하나</div>
       <div className="flex flex-wrap gap-x-2 gap-y-0.5 opacity-80 mb-2">
-        <span>사업자등록번호: 476-24-00343</span>
+        <span>사업자등록번호: 476-24-00353</span>
         <span className="text-gray-300">|</span>
         <span>통신판매업: 2016-인천서구-0890</span>
         <span className="w-full">주소: 경기도 김포시 양촌읍 누산봉성로53번길 74</span>
-        <span>고객센터: 02-1234-5678 (cs@kim-manager.com)</span>
+        <span>고객센터: 010-2364-4656 (chol5622729@naver.com)</span>
       </div>
       <div className="flex gap-3 font-bold opacity-80 cursor-pointer">
         <span onClick={() => onNavigate && onNavigate('terms')}>이용약관</span>
@@ -100,24 +114,35 @@ const Footer = ({ theme = 'light', onNavigate }) => {
 // =================================================================================
 function App() {
   const [currentScreen, setCurrentScreen] = useState('splash');
-  const [userType, setUserType] = useState('manager'); 
-  const [isPro, setIsPro] = useState(false); // false = 무료 회원 (워터마크 표시)
-
-  // [데이터 상태]
-  const [dataCount, setDataCount] = useState(1240);
-  const [savedPosts, setSavedPosts] = useState([]);
   
-  // [NEW] 저장 여부 확인을 위한 상태 (ResultScreen에서 사용)
-  const [isCurrentSaved, setIsCurrentSaved] = useState(false);
-  const [showCopyAlert, setShowCopyAlert] = useState(false); // 복사 경고 모달
-  const [pendingCopyText, setPendingCopyText] = useState(''); // 복사 대기 텍스트
+  // [1] 데이터 영구 저장: Safe Parser 적용 (Crash 방지)
+  const [userType, setUserType] = useState(() => localStorage.getItem('kim_userType') || 'manager'); 
+  const [isPro, setIsPro] = useState(() => getSafeLocalStorage('kim_isPro', false)); 
 
-  const [formData, setFormData] = useState({
+  const [dataCount, setDataCount] = useState(() => {
+    const val = localStorage.getItem('kim_dataCount');
+    return val ? Number(val) : 1240;
+  });
+  
+  const [savedPosts, setSavedPosts] = useState(() => getSafeLocalStorage('kim_savedPosts', []));
+   
+  // [API 결과 상태]
+  const [generatedContent, setGeneratedContent] = useState('');
+
+  // [저장 여부 확인 상태]
+  const [isCurrentSaved, setIsCurrentSaved] = useState(false);
+  const [showCopyAlert, setShowCopyAlert] = useState(false); 
+  const [pendingCopyText, setPendingCopyText] = useState(''); 
+
+  const initialFormData = {
     industry: '', location: '', feature: '', 
     topic: '', platform: '', target: '', nickname: '',
     rivalChannel: '', keywords: '', targetAudience: '',
-    naverLink: '', instaId: '', channelLink: ''
-  });
+    naverLink: '', instaId: '', channelLink: '',
+    storeName: '' 
+  };
+
+  const [formData, setFormData] = useState(() => getSafeLocalStorage('kim_formData', initialFormData));
     
   const [chatMessages, setChatMessages] = useState([]);
   const [chatStep, setChatStep] = useState(0); 
@@ -160,8 +185,41 @@ function App() {
     ? [ { id: 'blog', label: '블로그', icon: FileText }, { id: 'insta', label: '인스타', icon: Instagram } ]
     : [ { id: 'conti', label: '숏폼 콘티', icon: Film }, { id: 'title', label: '썸네일·제목', icon: Type } ];
 
-  // [NEW] 워터마크 텍스트 상수
   const watermarkText = "\n\n--------------\n🚀 이 글은 AI 마케터 김과장이 작성했습니다.\n👉 https://marketer-kim.vercel.app";
+
+  // --- [NEW] 데이터 변경 시 자동 저장 (Persistence) ---
+  useEffect(() => {
+    localStorage.setItem('kim_userType', userType);
+    localStorage.setItem('kim_isPro', JSON.stringify(isPro));
+    localStorage.setItem('kim_dataCount', dataCount);
+    localStorage.setItem('kim_savedPosts', JSON.stringify(savedPosts));
+    localStorage.setItem('kim_formData', JSON.stringify(formData));
+  }, [userType, isPro, dataCount, savedPosts, formData]);
+
+  // --- [NEW] 로그아웃 핸들러 (버그 수정: 완벽한 초기화) ---
+  const handleLogout = () => {
+    // 1. UI 닫기
+    setIsSidebarOpen(false);
+
+    // 2. 로컬 스토리지 삭제 (핵심)
+    localStorage.clear(); 
+    // 혹은 특정 키만 삭제: localStorage.removeItem('kim_formData'); 등등
+
+    // 3. 상태(State) 초기화
+    // 상태를 초기화하지 않으면 useEffect가 다시 돌면서 
+    // 메모리에 남은 값을 로컬 스토리지에 다시 저장해버리는 레이스 컨디션 방지
+    setFormData(initialFormData);
+    setChatMessages([]);
+    setChatStep(0);
+    setIsPro(false);
+    setUserType('manager');
+    setSavedPosts([]);
+    setDataCount(1240);
+
+    // 4. 스플래시 화면으로 이동 (로그인 화면 역할)
+    setCurrentScreen('splash');
+    alert("로그아웃 되었습니다.");
+  };
 
   // --- [NEW] 토스 결제 핸들러 ---
   const handlePayment = async () => {
@@ -175,34 +233,81 @@ function App() {
         orderName: "마케터 김과장 Pro (월간 구독)",
         successUrl: window.location.href,
         failUrl: window.location.href,
+      })
+      .catch((error) => {
+        if (error.code === 'USER_CANCEL') {
+          alert("결제가 취소되었습니다.");
+        } else {
+          alert(`결제 실패: ${error.message}`);
+        }
       });
+
     } catch (error) {
-      if (error.code === 'USER_CANCEL') {
-        alert("결제가 취소되었습니다.");
-      } else {
-        alert(`결제 실패: ${error.message}`);
-      }
+      console.error("Payment Error:", error);
+      alert(`결제 모듈을 불러오지 못했습니다: ${error.message}`);
     }
   };
 
-  // --- [NEW] 결제 성공 리다이렉트 처리 ---
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const paymentKey = urlParams.get('paymentKey');
+    const code = urlParams.get('code');
 
     if (paymentKey) {
-      alert("결제 성공! Pro 등급으로 전환됩니다.");
+      alert("결제 성공! Pro 등급으로 전환됩니다. 🎉");
       setIsPro(true);
       setCurrentScreen('home'); 
       window.history.replaceState({}, document.title, window.location.pathname);
-    } else if (urlParams.get('code')) {
-      alert("결제가 취소되었습니다.");
+    } else if (code) {
+      alert(`결제 실패 또는 취소되었습니다. (코드: ${code})`);
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, []);
 
-
   // --- Handlers ---
+   
+  const handleGenerateContent = async () => {
+    if (!contentTopic) return;
+    
+    setIsApplied(false); 
+    setIsCurrentSaved(false);
+    setResultTab(isManager ? 'blog' : 'conti');
+    setCurrentScreen('generating');
+
+    const payload = {
+        job: isManager ? 'store' : 'creator',
+        grade: isPro ? 'pro' : 'free',
+        storeName: formData.storeName, 
+        industry: isManager ? formData.industry : formData.keywords, 
+        location: formData.location || '',
+        description: isManager ? formData.feature : formData.targetAudience,
+        topic: contentTopic,
+        type: 'blog'
+    };
+
+    try {
+        const response = await fetch('http://localhost:5050/api/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+
+        if (data.result) {
+            setGeneratedContent(data.result);
+            setCurrentScreen('result');
+        } else {
+            throw new Error('No result received');
+        }
+
+    } catch (error) {
+        console.error("API Error:", error);
+        alert("글 생성에 실패했습니다. \n서버가 켜져있는지 확인해주세요!");
+        setCurrentScreen('upload'); 
+    }
+  };
+
   const handleApplyAdvice = () => {
     if (isPro) setIsApplied(true);
     else setShowPaywallModal(true);
@@ -221,10 +326,9 @@ function App() {
     setCurrentScreen('upload');
   };
 
-  // [저장 로직]
   const handleSaveResult = () => {
     setDataCount(prev => prev + 1);
-    setIsCurrentSaved(true); // 저장됨 상태로 변경
+    setIsCurrentSaved(true);
     const newPost = {
       id: Date.now(),
       date: new Date().toLocaleDateString(),
@@ -235,27 +339,22 @@ function App() {
     alert("저장 완료! 💾\n김과장이 이 데이터를 학습하였습니다.\n(브랜드 DNA에 반영되었습니다.)");
   };
 
-  // [복사 요청 핸들러] - 저장 여부 확인
   const requestCopyText = (text) => {
     if (isCurrentSaved) {
-      // 이미 저장했다면 바로 복사
       executeCopy(text);
     } else {
-      // 저장 안했으면 모달 띄우기
-      setPendingCopyText(text); // 복사할 텍스트 임시 저장
+      setPendingCopyText(text);
       setShowCopyAlert(true);
     }
   };
 
-  // [실제 복사 실행 함수]
   const executeCopy = (text) => {
     const finalContent = isPro ? text : text + watermarkText;
     navigator.clipboard.writeText(finalContent);
     alert("복사되었습니다! 📋" + (!isPro ? "\n(무료 버전은 워터마크가 포함됩니다)" : ""));
-    setShowCopyAlert(false); // 모달 닫기
+    setShowCopyAlert(false);
   };
 
-  // 문의 전송 로직
   const handleSendInquiry = () => {
     if (!inquiryText.trim()) return;
     setIsSendingInquiry(true);
@@ -274,17 +373,24 @@ function App() {
   const handleResetChat = () => {
     setChatMessages([]);
     setChatStep(0);
-    setFormData({ industry: '', location: '', feature: '', topic: '', platform: '', target: '', nickname: '', naverLink: '', instaId: '', rivalChannel: '', keywords: '', targetAudience: '', channelLink: '' });
+    setFormData(initialFormData);
     addSystemMessage(0);
   };
 
   // --- Effects ---
   useEffect(() => {
     if (currentScreen === 'splash') {
-      const timer = setTimeout(() => setCurrentScreen('onboarding'), 2000);
+      const timer = setTimeout(() => {
+        // [1] 자동 로그인 로직 강화: 닉네임 유효성 검사
+        if (formData && formData.nickname && formData.nickname.trim() !== '') {
+          setCurrentScreen('home');
+        } else {
+          setCurrentScreen('onboarding');
+        }
+      }, 2000);
       return () => clearTimeout(timer);
     }
-  }, [currentScreen]);
+  }, [currentScreen]); // 의존성 배열에서 formData 제거 (스플래시 화면 진입 시점의 데이터만 확인)
 
   useEffect(() => {
     if (currentScreen === 'input' && chatMessages.length === 0) {
@@ -299,13 +405,6 @@ function App() {
   useEffect(() => {
     if (currentScreen === 'analyzing') {
       const timer = setTimeout(() => setCurrentScreen('home'), 3000);
-      return () => clearTimeout(timer);
-    }
-    if (currentScreen === 'generating') {
-      setIsApplied(false); 
-      setIsCurrentSaved(false); // 새 글 생성 시 저장 상태 초기화
-      setResultTab(isManager ? 'blog' : 'conti');
-      const timer = setTimeout(() => setCurrentScreen('result'), 3000);
       return () => clearTimeout(timer);
     }
   }, [currentScreen]);
@@ -323,23 +422,94 @@ function App() {
 
     if (isManager) {
       if (step === 0) messagesToAdd = [{ type: 'text', text: "안녕하세요 사장님! 👋\n어떤 사업을 하시나요?\n(예: 고깃집, 꽃집, 헬스장)" }];
-      else if (step === 1) messagesToAdd = [{ type: 'text', text: `아, ${val || formData.industry}이군요! 🌸\n매장 위치는 어디인가요?\n(예: 서울 강남구 테헤란로)` }];
-      else if (step === 2) {
+      else if (step === 1) messagesToAdd = [{ type: 'text', text: `아, ${val || formData.industry}이군요! 🌸\n매장의 **정확한 상호명(이름)**은 무엇인가요?` }]; 
+      else if (step === 2) messagesToAdd = [{ type: 'text', text: `${val || formData.storeName}, 이름이 좋네요! 👍\n매장 위치는 어디인가요?\n(예: 서울 강남구 테헤란로)` }]; 
+      else if (step === 3) { 
         setIsTyping(false); 
         setChatMessages(prev => [...prev, { id: Date.now(), text: "🔍 데이터를 분석하고 있습니다...", isUser: false, type: 'loading' }]);
-        setTimeout(() => {
-          setChatMessages(prev => prev.filter(msg => msg.type !== 'loading'));
-          const analysisMsg = { type: 'analysis', data: { title: `${val} 상권 분석`, count: '12,500', level: 'High' } };
-          const nextQuestion = { type: 'text', text: "경쟁이 치열하네요! 🔥\n전략을 잘 짜야겠습니다.\n\n우리 가게만의 특별한\n자랑거리가 있나요?\n(예: 24시 무인운영)" };
-          setChatMessages(prev => [...prev, { id: Date.now(), ...analysisMsg, isUser: false }, { id: Date.now() + 1, ...nextQuestion, isUser: false }]);
-        }, 1500); return; 
-      } else if (step === 3) messagesToAdd = [{ type: 'text', text: "접수했습니다! 📝\n\n운영 중인 채널 주소를 알려주세요.\n분석에 큰 도움이 됩니다.\n(없으면 건너뛰기 가능)" }];
-      else if (step === 4) messagesToAdd = [{ type: 'text', text: "좋아요! 이제 거의 다 왔습니다. 😎\n\n마지막으로 앱에서 사용하실\n멋진 닉네임을 정해주세요!" }];
-      else if (step === 5) messagesToAdd = [{ type: 'text', text: `반갑습니다, ${val} 사장님! 🎉\n[${formData.location}]에 위치한\n[${formData.feature} ${formData.industry}]\n(으)로 세팅할까요?` }];
+        
+        // [NEW] API Call for Analysis
+        const fetchAnalysis = async () => {
+            try {
+                const keyword = `${val} ${formData.industry}`;
+                const response = await fetch('http://localhost:5050/api/analyze/keyword', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ keyword })
+                });
+                
+                const data = await response.json();
+                
+                // 로딩 메시지 제거
+                setChatMessages(prev => prev.filter(msg => msg.type !== 'loading'));
+                
+                // [NEW] 검색량(total) 기반 8단계 분석 시나리오
+                const total = data.total || 0;
+                let level = "";
+                let desc = "";
+
+                if (total <= 500) {
+                  level = "매우 낮음 (독점 찬스 🔑)";
+                  desc = "사장님, **'나만 알고 싶은 시크릿 상권'**에서 매장을 운영 중이시군요! 🤫\n검색량은 적지만, 경쟁자도 거의 없어 글 하나만 써도 **바로 1등 노출**이 가능합니다.";
+                } else if (total <= 1000) {
+                  level = "낮음 (블루오션 🌊)";
+                  desc = "사장님, 아직 경쟁이 치열하지 않은 **'숨은 보석 같은 상권'**에서 매장을 운영 중이시군요! 💎\n지금부터 온라인 입지를 단단히 다져놓으면 나중에 이곳이 뜰 때 그 유입을 전부 단골로 만들 수 있습니다.";
+                } else if (total <= 5000) {
+                  level = "보통 (실속형 💰)";
+                  desc = "오, 딱 좋습니다! **'우리 동네 알짜배기 상권'**에 계시네요.\n허수가 아니라 **진짜 방문하려는 실속 고객들**이 꾸준히 검색하는 구간입니다. 지금 바로 진입해서 **'동네 1등 매장'**으로 자리 잡기 최적의 타이밍입니다!";
+                } else if (total <= 10000) {
+                  level = "약간 높음 (진검승부 ⚔️)";
+                  desc = "사장님, 매장 위치가 **'떠오르는 핫플레이스'** 길목에 있군요! ✨\n월 1만 명 가까이 검색한다는 건 유동 인구가 꽤 된다는 뜻입니다. 우리 가게만의 **확실한 무기(차별점)** 하나만 보여주면 손님들을 확 끌어올 수 있습니다.";
+                } else if (total <= 50000) {
+                  level = "높음 (전쟁터 💥)";
+                  desc = "와, 검색량이 상당합니다! **'지역 대표 번화가'**에서 치열하게 장사하고 계시네요. 💪\n경쟁자도 많겠지만, 수요가 워낙 많아서 여기서 온라인 꽉 잡으면 **매장 전화기에 불이 날 수도 있습니다.**";
+                } else if (total <= 100000) {
+                  level = "매우 높음 (대박 찬스 🎰)";
+                  desc = "이 정도면 거의 **'랜드마크급 상권'** 한복판에 계시는 건데요?! 😲\n워낙 유명한 곳이라 쉽진 않겠지만, **2~3페이지에만 걸려도 웬만한 지역 1등보다 손님이 더 많이 올 거예요.** 물 들어올 때 노 저어야죠!";
+                } else if (total <= 200000) {
+                  level = "최상 (도전! 🚩)";
+                  desc = "사장님... **'전국구 핫플'** 중심에서 장사하고 계셨군요. 👏\n이곳은 단순한 동네가 아니라 **유행을 선도하는 트렌드의 중심**입니다. 잘 쓴 글 하나로 **대기 줄을 세울 수도 있는 엄청난 잠재력**이 있는 곳입니다.";
+                } else {
+                  level = "측정 불가 (초대박 🚀)";
+                  desc = "와... 월 20만 명이 넘게 검색하는 **'초대형 메가 상권'**입니다. 😱\n여기서 온라인 1페이지를 먹으면 **사장님 인생이 바뀔 수도 있습니다.** 우리 가게의 운명을 걸고 가장 완벽한 전략으로 도전해봅시다!";
+                }
+
+                // 1. 분석 카드 메시지
+                const analysisMsg = { 
+                    type: 'analysis', 
+                    data: { 
+                        title: `${keyword} 상권 분석`, 
+                        count: total.toLocaleString(), 
+                        level: level 
+                    } 
+                };
+                
+                // 2. 텍스트 말풍선
+                const nextQuestion = { 
+                    type: 'text', 
+                    text: `[분석완료] '${keyword}' 검색량이 월 ${total.toLocaleString()}건입니다! 📈\n\n${desc}\n\n우리 가게만의 특별한\n자랑거리가 있나요?\n(예: 24시 무인운영)` 
+                };
+                
+                setChatMessages(prev => [...prev, { id: Date.now(), ...analysisMsg, isUser: false }, { id: Date.now() + 1, ...nextQuestion, isUser: false }]);
+                
+            } catch (error) {
+                console.error("Analysis Error:", error);
+                setChatMessages(prev => prev.filter(msg => msg.type !== 'loading'));
+                const nextQuestion = { type: 'text', text: "데이터 분석 중 문제가 발생했습니다 😢\n하지만 괜찮아요! 우리 가게만의\n자랑거리를 알려주시겠어요?" };
+                setChatMessages(prev => [...prev, { id: Date.now(), ...nextQuestion, isUser: false }]);
+            }
+        };
+        fetchAnalysis();
+        return; 
+      } 
+      else if (step === 4) messagesToAdd = [{ type: 'text', text: "접수했습니다! 📝\n\n운영 중인 채널 주소를 알려주세요.\n분석에 큰 도움이 됩니다.\n(없으면 건너뛰기 가능)" }];
+      else if (step === 5) messagesToAdd = [{ type: 'text', text: "좋아요! 이제 거의 다 왔습니다. 😎\n\n마지막으로 앱에서 사용하실\n멋진 닉네임을 정해주세요!" }];
+      else if (step === 6) messagesToAdd = [{ type: 'text', text: `반갑습니다, ${val} 사장님! 🎉\n[${formData.location}]에 위치한\n[${formData.storeName}]\n(으)로 세팅할까요?` }];
     } else {
       if (step === 0) messagesToAdd = [{ type: 'text', text: "반갑습니다 PD님! 🎬\n롤모델이나 라이벌 채널의 이름(또는 링크)을 알려주세요! 그들의 성공 공식을 분석해 드릴게요." }];
-      else if (step === 1) messagesToAdd = [{ type: 'text', text: "분석 완료! 😎\n내 채널을 설명하는 핵심 키워드 3가지는 무엇인가요? (예: 가성비, 병맛, 정보전달)" }];
-      else if (step === 2) {
+      else if (step === 1) messagesToAdd = [{ type: 'text', text: "확인했습니다! 😎\n내 채널명(또는 활동명)은 무엇인가요?" }]; 
+      else if (step === 2) messagesToAdd = [{ type: 'text', text: "멋진 이름이네요. ✨\n내 채널을 설명하는 핵심 키워드 3가지는 무엇인가요? (예: 가성비, 병맛, 정보전달)" }];
+      else if (step === 3) {
         setIsTyping(false); 
         setChatMessages(prev => [...prev, { id: Date.now(), text: "📡 라이벌 채널 알고리즘 분석 중...", isUser: false, type: 'loading' }]);
         setTimeout(() => {
@@ -348,9 +518,9 @@ function App() {
           const nextQuestion = { type: 'text', text: "성공 공식이 보입니다! 🚀\n내 영상을 주로 누가 봤으면 하나요? (예: 20대 취준생, 재테크족)" };
           setChatMessages(prev => [...prev, { id: Date.now(), ...analysisMsg, isUser: false }, { id: Date.now() + 1, ...nextQuestion, isUser: false }]);
         }, 1500); return; 
-      } else if (step === 3) messagesToAdd = [{ type: 'text', text: "접수했습니다! 📝\n\n운영 중인 채널이 있다면 링크를 알려주세요.\n분석에 큰 도움이 됩니다." }];
-      else if (step === 4) messagesToAdd = [{ type: 'text', text: "확실한 타겟이네요! 😎\n\n마지막으로 앱에서 사용하실\n활동명을 알려주세요!" }];
-      else if (step === 5) messagesToAdd = [{ type: 'text', text: `반갑습니다, ${val}님! 🎉\n[${formData.targetAudience} 타겟 ${formData.keywords}]\n채널로 세팅할까요?` }];
+      } else if (step === 4) messagesToAdd = [{ type: 'text', text: "접수했습니다! 📝\n\n운영 중인 채널이 있다면 링크를 알려주세요.\n분석에 큰 도움이 됩니다." }];
+      else if (step === 5) messagesToAdd = [{ type: 'text', text: "확실한 타겟이네요! 😎\n\n마지막으로 앱에서 사용하실\n활동명을 알려주세요!" }];
+      else if (step === 6) messagesToAdd = [{ type: 'text', text: `반갑습니다, ${val}님! 🎉\n[${formData.storeName}]\n채널로 세팅할까요?` }];
     }
 
     setTimeout(() => {
@@ -369,7 +539,7 @@ function App() {
     setChatMessages(prev => [...prev, userMsg]);
     if (isManager) setFormData(prev => ({ ...prev, naverLink: snsInput.naver, instaId: snsInput.insta }));
     else setFormData(prev => ({ ...prev, channelLink: snsInput.channel, instaId: snsInput.insta }));
-    const nextStep = 4;
+    const nextStep = 5; // [Step Shift] 4 -> 5
     setChatStep(nextStep);
     addSystemMessage(nextStep);
   };
@@ -384,17 +554,19 @@ function App() {
 
     if (isManager) {
       if (chatStep === 0) setFormData(prev => ({ ...prev, industry: value }));
-      else if (chatStep === 1) setFormData(prev => ({ ...prev, location: value }));
-      else if (chatStep === 2) setFormData(prev => ({ ...prev, feature: value }));
-      else if (chatStep === 4) setFormData(prev => ({ ...prev, nickname: value })); 
+      else if (chatStep === 1) setFormData(prev => ({ ...prev, storeName: value })); 
+      else if (chatStep === 2) setFormData(prev => ({ ...prev, location: value }));
+      else if (chatStep === 3) setFormData(prev => ({ ...prev, feature: value }));
+      else if (chatStep === 5) setFormData(prev => ({ ...prev, nickname: value })); 
     } else {
       if (chatStep === 0) setFormData(prev => ({ ...prev, rivalChannel: value }));
-      else if (chatStep === 1) setFormData(prev => ({ ...prev, keywords: value }));
-      else if (chatStep === 2) setFormData(prev => ({ ...prev, targetAudience: value }));
-      else if (chatStep === 4) setFormData(prev => ({ ...prev, nickname: value }));
+      else if (chatStep === 1) setFormData(prev => ({ ...prev, storeName: value })); 
+      else if (chatStep === 2) setFormData(prev => ({ ...prev, keywords: value }));
+      else if (chatStep === 3) setFormData(prev => ({ ...prev, targetAudience: value }));
+      else if (chatStep === 5) setFormData(prev => ({ ...prev, nickname: value }));
     }
     
-    if (nextStep <= 5) addSystemMessage(nextStep, value);
+    if (nextStep <= 6) addSystemMessage(nextStep, value); 
   };
 
   return (
@@ -422,13 +594,15 @@ function App() {
               <button onClick={() => { setIsSidebarOpen(false); setCurrentScreen('subscription'); }} className="flex w-full items-center gap-3 rounded-xl p-3 text-gray-700 hover:bg-gray-50"><CreditCard size={20} className="text-gray-400" /> <div className="flex flex-1 justify-between"><span className="font-medium">결제 관리</span><span className={`text-xs font-bold ${isPro ? themeColor : 'text-gray-400'}`}>{isPro ? 'Pro 이용중' : '업그레이드'}</span></div></button>
               <button onClick={() => { setIsSidebarOpen(false); setCurrentScreen('customerCenter'); }} className="flex w-full items-center gap-3 rounded-xl p-3 text-gray-700 hover:bg-gray-50"><HelpCircle size={20} className="text-gray-400" /> <span className="font-medium">고객센터</span></button>
               <div className="my-2 h-px bg-gray-100" />
-              <button onClick={() => { setIsSidebarOpen(false); setCurrentScreen('splash'); }} className="flex w-full items-center gap-3 rounded-xl p-3 text-red-500 hover:bg-red-50"><LogOut size={20} /> <span className="font-medium">로그아웃</span></button>
+              {/* [NEW] 로그아웃 버튼에 handleLogout 연결 */}
+              <button onClick={handleLogout} className="flex w-full items-center gap-3 rounded-xl p-3 text-red-500 hover:bg-red-50"><LogOut size={20} /> <span className="font-medium">로그아웃</span></button>
               <div className="mt-8 border-t border-dashed border-gray-200 pt-4"><p className="px-3 text-[10px] font-bold text-gray-400 mb-2">DEVELOPER OPTIONS</p><button onClick={() => setIsPro(!isPro)} className="flex w-full items-center justify-between gap-3 rounded-xl bg-gray-50 p-3 text-gray-600 hover:bg-gray-100"><span className="text-xs font-bold">[Dev] Pro 모드 강제전환</span><div className={`relative h-5 w-9 rounded-full transition-colors ${isPro ? 'bg-green-500' : 'bg-gray-300'}`}><div className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white transition-transform ${isPro ? 'translate-x-4' : ''}`} /></div></button></div>
             </div>
           </motion.div>
         </>
       )}
 
+      {/* 나머지 화면들... */}
       <AnimatePresence mode="wait">
         
         {/* Screen 1: Splash */}
@@ -460,7 +634,9 @@ function App() {
                  <motion.div key={msg.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`flex w-full ${msg.isUser ? 'justify-end' : 'justify-start'}`}>
                    {!msg.isUser && <div className={`mr-2 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full ${isManager ? 'bg-indigo-100 text-indigo-600' : 'bg-pink-100 text-pink-600'}`}><PartnerIcon size={16}/></div>}
                    {msg.type === 'analysis' ? (
-                     <div className="w-[75%] rounded-[20px] bg-white border border-gray-100 p-4 shadow-md rounded-tl-none"><div className="text-xs font-bold text-gray-500 mb-2">📊 {isManager ? '실시간 상권 분석' : '알고리즘 패턴 분석'}</div><div className="mb-3"><h4 className="text-sm font-bold text-gray-900">{msg.data.title}</h4><div className="flex items-end gap-1 mt-1"><span className="text-2xl font-bold text-indigo-600">{msg.data.count}</span><span className="text-xs text-gray-400 mb-1">건 조회</span></div></div><div className="flex items-center gap-2 rounded-lg bg-red-50 p-2"><div className="rounded bg-red-100 p-1 text-red-500"><Siren size={14}/></div><div className="text-xs font-bold text-red-600">{msg.data.level === 'High' ? '경쟁 강도: 매우 높음 🔥' : '바이럴 잠재력: 최상 🚀'}</div></div></div>
+                     <div className="w-[75%] rounded-[20px] bg-white border border-gray-100 p-4 shadow-md rounded-tl-none"><div className="text-xs font-bold text-gray-500 mb-2">📊 {isManager ? '실시간 상권 분석' : '알고리즘 패턴 분석'}</div><div className="mb-3"><h4 className="text-sm font-bold text-gray-900">{msg.data.title}</h4><div className="flex items-end gap-1 mt-1"><span className="text-2xl font-bold text-indigo-600">{msg.data.count}</span><span className="text-xs text-gray-400 mb-1">건 조회</span></div></div><div className="flex items-center gap-2 rounded-lg bg-red-50 p-2"><div className="rounded bg-red-100 p-1 text-red-500"><Siren size={14}/></div>
+                     {/* [2] 렌더링 로직 수정: 시나리오별 level 텍스트 출력 */}
+                     <div className="text-xs font-bold text-red-600">경쟁 강도: {msg.data.level}</div></div></div>
                    ) : msg.type === 'loading' ? (
                      <div className="rounded-[20px] rounded-tl-none bg-white px-4 py-3 border border-gray-100 shadow-sm text-sm text-gray-500 flex items-center gap-2"><Loader2 size={16} className="animate-spin" /> {msg.text}</div>
                    ) : (
@@ -473,7 +649,7 @@ function App() {
             </div>
             
             <div className="bg-white px-4 pb-6 pt-2 border-t border-gray-100">
-               {chatStep === 3 ? (
+               {chatStep === 4 ? ( // [Step Shift] 3 -> 4
                  <div className="space-y-3">
                    <div className="flex gap-2">
                      {isManager ? (
@@ -486,7 +662,7 @@ function App() {
                    <div className="flex justify-between items-center"><button onClick={() => setShowLinkGuide(!showLinkGuide)} className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600"><HelpCircle size={12}/> 주소 복사하는 법</button><button onClick={handleSnsSubmit} className={`rounded-xl px-6 py-2.5 text-sm font-bold text-white shadow-md active:scale-95 transition-transform ${bgTheme}`}>입력 완료</button></div>
                    <AnimatePresence>{showLinkGuide && (<motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="absolute bottom-20 left-4 right-4 rounded-xl bg-gray-900 p-4 text-white shadow-xl z-20"><div className="flex justify-between mb-2"><span className="text-xs font-bold text-yellow-400">💡 김과장의 꿀팁</span><X size={14} className="cursor-pointer" onClick={() => setShowLinkGuide(false)}/></div><p className="text-xs leading-relaxed opacity-90">앱을 끄지 않고 홈으로 나가셔도 됩니다!<br/>1. 채널/가게 검색 &gt; 공유 &gt; 복사<br/>2. 인스타그램: 프로필 &gt; 프로필 공유 &gt; 링크 복사</p></motion.div>)}</AnimatePresence>
                  </div>
-               ) : chatStep < 5 ? (
+               ) : chatStep < 6 ? ( // [Step Shift] 5 -> 6
                  <div className="relative flex items-center">
                    <input type="text" value={inputText} onChange={(e) => setInputText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()} placeholder="메시지를 입력하세요..." disabled={isTyping} className={`w-full rounded-full bg-gray-50 py-3.5 pl-5 pr-12 text-sm text-gray-900 outline-none transition-all ${borderTheme} border border-transparent focus:bg-white focus:shadow-md`}/>
                    <button onClick={handleSendMessage} disabled={!inputText.trim() || isTyping} className={`absolute right-1.5 rounded-full p-2 transition-colors ${inputText.trim() ? `${themeColor} hover:bg-gray-100` : 'text-gray-300'}`}><Send size={20} /></button>
@@ -532,7 +708,6 @@ function App() {
                 <div className="flex items-center gap-4 p-3 rounded-xl bg-gray-800/50"><div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-800 text-indigo-400"><TrendingUp size={20}/></div><div><p className="font-bold text-white text-sm">C-Rank & DIA 로직 최적화</p><p className="text-xs text-gray-500">체류시간 증대를 위한 훅(Hook) 설계</p></div></div>
                 <div className="flex items-center gap-4 p-3 rounded-xl bg-gray-800/50"><div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-800 text-indigo-400"><MapPin size={20}/></div><div><p className="font-bold text-white text-sm">Local SEO & CTA 전략</p><p className="text-xs text-gray-500">플레이스 리뷰 유도 및 행동 지침 설계</p></div></div>
                 <div className="flex items-center gap-4 p-3 rounded-xl bg-gray-800/50"><div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-800 text-indigo-400"><MousePointerClick size={20}/></div><div><p className="font-bold text-white text-sm">CVR(전환율) 최적화</p><p className="text-xs text-gray-500">희소성/긴박감(FOMO) 조성 멘트 자동 생성</p></div></div>
-                {/* [1] 혜택 추가: 워터마크 제거 */}
                 <div className="flex items-center gap-4 p-3 rounded-xl bg-gray-800/50">
                   <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-800 text-indigo-400"><Eraser size={20}/></div>
                   <div><p className="font-bold text-white text-sm">워터마크(홍보 문구) 제거</p><p className="text-xs text-gray-500">깔끔한 원본 텍스트 복사 가능</p></div>
@@ -780,17 +955,17 @@ function App() {
                   </div>
                 </div>
               )}
-              <div className="mb-8"><label className="mb-3 block text-sm font-bold text-gray-700">어떤 주제로 쓸까요?</label><input type="text" placeholder={uploadContext ? "전략에 맞는 문구를 자동 생성합니다..." : "예: 비오는 날 감성, 신메뉴 출시"} value={contentTopic} onChange={(e) => setContentTopic(e.target.value)} className={`w-full rounded-2xl bg-gray-50 p-4 text-gray-900 outline-none border border-transparent transition-all ${borderTheme} focus:bg-white focus:shadow-lg`}/></div><button onClick={() => setCurrentScreen('generating')} disabled={!contentTopic} className={`w-full rounded-[20px] py-4 text-lg font-bold text-white shadow-xl transition-all active:scale-95 disabled:opacity-50 disabled:active:scale-100 ${uploadContext ? 'bg-red-500 shadow-red-200' : `${bgTheme} shadow-${isManager ? 'indigo' : 'pink'}-200`}`}>{uploadContext ? '반격 콘텐츠 생성하기' : '콘텐츠 생성하기'}</button></div><AnimatePresence>{showGuideModal && isManager && (<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 px-8"><motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} className="w-full max-w-sm overflow-hidden rounded-[24px] bg-white text-center shadow-2xl"><div className={`flex h-32 w-full flex-col items-center justify-center ${bgTheme}`}><Camera className="h-10 w-10 text-white mb-2" /><h3 className="text-xl font-bold text-white">촬영 꿀팁 📸</h3></div><div className="p-6"><p className="mb-6 text-gray-600 leading-relaxed">"사진은 <strong>1:1 비율</strong>이 좋아요!<br/>음식은 <strong>45도 각도</strong>에서,<br/>제품은 <strong>자연광</strong>에서 찍어주세요."</p><button onClick={() => setShowGuideModal(false)} className={`w-full rounded-xl py-3 font-bold text-white ${bgTheme}`}>네, 알겠어요!</button></div></motion.div></motion.div>)}</AnimatePresence>
+              {/* [NEW] 버튼 클릭 시 handleGenerateContent 호출 */}
+              <div className="mb-8"><label className="mb-3 block text-sm font-bold text-gray-700">어떤 주제로 쓸까요?</label><input type="text" placeholder={uploadContext ? "전략에 맞는 문구를 자동 생성합니다..." : "예: 비오는 날 감성, 신메뉴 출시"} value={contentTopic} onChange={(e) => setContentTopic(e.target.value)} className={`w-full rounded-2xl bg-gray-50 p-4 text-gray-900 outline-none border border-transparent transition-all ${borderTheme} focus:bg-white focus:shadow-lg`}/></div><button onClick={handleGenerateContent} disabled={!contentTopic} className={`w-full rounded-[20px] py-4 text-lg font-bold text-white shadow-xl transition-all active:scale-95 disabled:opacity-50 disabled:active:scale-100 ${uploadContext ? 'bg-red-500 shadow-red-200' : `${bgTheme} shadow-${isManager ? 'indigo' : 'pink'}-200`}`}>{uploadContext ? '반격 콘텐츠 생성하기' : '콘텐츠 생성하기'}</button></div><AnimatePresence>{showGuideModal && isManager && (<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 px-8"><motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} className="w-full max-w-sm overflow-hidden rounded-[24px] bg-white text-center shadow-2xl"><div className={`flex h-32 w-full flex-col items-center justify-center ${bgTheme}`}><Camera className="h-10 w-10 text-white mb-2" /><h3 className="text-xl font-bold text-white">촬영 꿀팁 📸</h3></div><div className="p-6"><p className="mb-6 text-gray-600 leading-relaxed">"사진은 <strong>1:1 비율</strong>이 좋아요!<br/>음식은 <strong>45도 각도</strong>에서,<br/>제품은 <strong>자연광</strong>에서 찍어주세요."</p><button onClick={() => setShowGuideModal(false)} className={`w-full rounded-xl py-3 font-bold text-white ${bgTheme}`}>네, 알겠어요!</button></div></motion.div></motion.div>)}</AnimatePresence>
           </motion.div>
         )}
 
         {currentScreen === 'generating' && (<motion.div key="generating" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex h-full w-full flex-col items-center justify-center bg-white px-6 text-center"><div className={`relative mb-8 flex h-24 w-24 items-center justify-center rounded-full bg-gray-50`}><Sparkles className={`h-10 w-10 animate-pulse ${themeColor}`} /><motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 3, ease: "linear" }} className={`absolute inset-0 rounded-full border-t-2 ${isManager ? 'border-indigo-500' : 'border-pink-500'}`}/></div><h2 className="mb-2 text-xl font-bold text-gray-900">AI가 글을 쓰고 있어요</h2><p className="text-sm text-gray-500">"{contentTopic}" 주제로<br/>가장 반응이 좋은 톤앤매너를 찾는 중...</p></motion.div>)}
         
-        {/* Result Screen (Updated: Watermark Logic + Copy Logic) */}
+        {/* Result Screen (Updated: Display API Generated Content) */}
         {currentScreen === 'result' && (
           <motion.div key="result" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="flex h-full flex-col bg-gray-50 relative">
             
-            {/* [NEW] 복사 경고 모달 */}
             <AnimatePresence>
               {showCopyAlert && (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-8">
@@ -799,8 +974,8 @@ function App() {
                     <h3 className="text-lg font-bold text-gray-900 mb-2">잠깐! 🛑 저장을 안 하셨네요.</h3>
                     <p className="text-sm text-gray-500 mb-6 leading-relaxed">저장을 해야 마케팅 데이터가 쌓여서<br/>김과장이 더 똑똑해집니다.<br/>그래도 그냥 복사하시겠습니까?</p>
                     <div className="flex gap-2">
-                       <button onClick={() => setShowCopyAlert(false)} className="flex-1 rounded-xl bg-gray-100 py-3 text-sm font-bold text-gray-600">취소 (저장하기)</button>
-                       <button onClick={() => executeCopy(pendingCopyText)} className="flex-1 rounded-xl bg-red-500 py-3 text-sm font-bold text-white">확인 (그냥 복사)</button>
+                        <button onClick={() => setShowCopyAlert(false)} className="flex-1 rounded-xl bg-gray-100 py-3 text-sm font-bold text-gray-600">취소 (저장하기)</button>
+                        <button onClick={() => executeCopy(pendingCopyText)} className="flex-1 rounded-xl bg-red-500 py-3 text-sm font-bold text-white">확인 (그냥 복사)</button>
                     </div>
                   </motion.div>
                 </motion.div>
@@ -816,8 +991,9 @@ function App() {
                     <div className="space-y-4">
                       <div className="border-b border-gray-100 pb-3"><span className="text-xs font-bold text-green-500 mb-1 block">NAVER BLOG</span><h3 className="text-lg font-bold text-gray-900 leading-snug">{isApplied ? `🚨 ${formData.location} ${contentTopic} 종결자! 사장님이 미쳤어요 😲` : `${formData.location} ${contentTopic} 솔직 후기! (feat. 사장님 추천)`}</h3></div>
                       <div className="space-y-3 text-sm text-gray-600 leading-relaxed">
-                        {isApplied ? <><p><strong>"아직도 여기 안 가보셨어요?"</strong></p><p>솔직히 말씀드릴게요. {formData.location}에서...</p></> : <><p>안녕하세요! 여러분 😊</p><p>오늘은 비도 오고 해서...</p></>}
-                        {/* 워터마크 표시 */}
+                        {/* [NEW] 생성된 텍스트 표시 */}
+                        <div className="whitespace-pre-wrap">{generatedContent}</div>
+                        
                         {!isPro && <div className="mt-8 pt-4 border-t border-dashed border-gray-200 text-xs text-gray-400 whitespace-pre-wrap">{watermarkText.trim()}</div>}
                       </div>
                     </div>
@@ -829,7 +1005,6 @@ function App() {
                       <div className="flex justify-between text-gray-800"><div className="flex gap-4"><Heart /><MessageCircle /><Send /></div><Bookmark /></div>
                       <div className="text-sm text-gray-800 leading-relaxed"><p className="mb-1"><span className="font-bold mr-2">{formData.nickname || 'manager'}</span>{isApplied ? "이거 모르면 진짜 손해...😱" : "비 오는 날엔 역시 이거지! ☔️✨"}</p></div>
                       <div className="text-blue-600 text-sm">#{formData.location} #{contentTopic} {isApplied && "#사장님이미쳤어요 #이벤트"}</div>
-                      {/* 워터마크 표시 */}
                       {!isPro && <div className="mt-4 pt-4 border-t border-dashed border-gray-200 text-xs text-gray-400 whitespace-pre-wrap">{watermarkText.trim()}</div>}
                     </div>
                   )}
@@ -841,22 +1016,23 @@ function App() {
                       <div className="border-l-4 border-pink-500 pl-4"><span className="text-xs font-bold text-pink-500 block mb-1">Scene 1: 3초 후킹</span><p className="text-sm font-bold text-gray-900">{isApplied ? "\"이거 모르면 100만원 손해봅니다!\"" : "\"오늘 대박 소식 알려드립니다!\""}</p><p className="text-xs text-gray-400 mt-1">🎬 화면: 클로즈업 + 자막 크게</p></div>
                       <div className="border-l-4 border-gray-200 pl-4"><span className="text-xs font-bold text-gray-400 block mb-1">Scene 2: 문제 제기</span><p className="text-sm font-bold text-gray-900">{contentTopic}의 충격적인 진실 공개</p></div>
                       <div className="border-l-4 border-gray-200 pl-4"><span className="text-xs font-bold text-gray-400 block mb-1">Scene 3: 해결책</span><p className="text-sm font-bold text-gray-900">댓글 링크에서 확인하세요!</p></div>
-                      {/* 워터마크 표시 */}
+                      {/* [NEW] 생성된 텍스트 표시 (숏폼 콘티용) */}
+                      <div className="mt-4 pt-4 border-t border-gray-100 whitespace-pre-wrap text-sm text-gray-800">{generatedContent}</div>
+                      
                       {!isPro && <div className="mt-8 pt-4 border-t border-dashed border-gray-200 text-xs text-gray-400 whitespace-pre-wrap">{watermarkText.trim()}</div>}
                     </div>
                   )}
                   {resultTab === 'title' && (
                     <div className="space-y-4">
                       <div className="space-y-2"><label className="text-xs font-bold text-gray-400">추천 제목 3종</label>{[1,2,3].map(i => <div key={i} className="bg-gray-50 p-3 rounded-xl text-sm font-bold text-gray-800 border border-gray-100 flex justify-between"><span>{i}. {isApplied ? `클릭하면 무조건 이득! ${contentTopic}` : `${contentTopic} 솔직 리뷰`}</span><Copy size={14} className="text-gray-300"/></div>)}</div>
-                      {/* 워터마크 표시 */}
                       {!isPro && <div className="mt-8 pt-4 border-t border-dashed border-gray-200 text-xs text-gray-400 whitespace-pre-wrap">{watermarkText.trim()}</div>}
                     </div>
                   )}
                 </>
               )}
             </div>
-            {/* [NEW] 복사하기 버튼 로직 변경: requestCopyText 사용 */}
-            <div className="mt-6 flex gap-3"><button onClick={() => requestCopyText("생성된 텍스트")} className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-gray-100 py-3.5 text-sm font-bold text-gray-700 hover:bg-gray-200"><Copy size={18} /> 복사하기</button><button className={`flex-1 flex items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-bold text-white ${bgTheme}`}><Share2 size={18} /> 공유하기</button></div><p className="mt-4 text-center text-xs text-gray-400">💡 저장을 누르셔야 AI가 사장님 스타일을 학습해<br/>다음번에 더 완벽한 글을 씁니다!</p></div></motion.div>)}
+            {/* [NEW] 복사하기 버튼 로직: requestCopyText에 generatedContent 전달 */}
+            <div className="mt-6 flex gap-3"><button onClick={() => requestCopyText(generatedContent)} className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-gray-100 py-3.5 text-sm font-bold text-gray-700 hover:bg-gray-200"><Copy size={18} /> 복사하기</button><button className={`flex-1 flex items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-bold text-white ${bgTheme}`}><Share2 size={18} /> 공유하기</button></div><p className="mt-4 text-center text-xs text-gray-400">💡 저장을 누르셔야 AI가 사장님 스타일을 학습해<br/>다음번에 더 완벽한 글을 씁니다!</p></div></motion.div>)}
         
         {currentScreen === 'notification' && (<motion.div key="notification" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className="flex h-full w-full flex-col bg-gray-50"><div className="flex items-center gap-3 bg-white px-6 pt-8 pb-4 sticky top-0 z-10 border-b border-gray-100"><button onClick={() => setCurrentScreen('home')} className="rounded-full bg-gray-50 p-2 hover:bg-gray-100"><ArrowRight className="rotate-180" size={20} /></button><h2 className="text-lg font-bold text-gray-900">알림 센터</h2></div><div className="flex-1 overflow-y-auto px-6 py-6 space-y-4"><div className="flex gap-4 rounded-2xl bg-white p-4 shadow-sm border border-red-50"><div className="flex-shrink-0 mt-1 text-red-500"><AlertTriangle size={20} /></div><div><h4 className="font-bold text-gray-900 text-sm mb-1">부정 리뷰 감지 🚨</h4><p className="text-xs text-gray-600 leading-relaxed">{isManager ? "옆집 A가게에 '불친절' 키워드가 포함된 리뷰가 등록되었습니다." : "경쟁 채널 B에 '광고 너무 많음' 댓글이 급증하고 있습니다."}</p><span className="text-[10px] text-gray-400 mt-2 block">1시간 전</span></div></div><div className="flex gap-4 rounded-2xl bg-white p-4 shadow-sm border border-blue-50"><div className="flex-shrink-0 mt-1 text-blue-500"><TrendingDown size={20} /></div><div><h4 className="font-bold text-gray-900 text-sm mb-1">가격/트렌드 변동 📉</h4><p className="text-xs text-gray-600 leading-relaxed">{isManager ? "B가게가 김치찌개 가격을 1,000원 인하했습니다." : "먹방 카테고리 시청 지속 시간이 소폭 하락했습니다."}</p><span className="text-[10px] text-gray-400 mt-2 block">3시간 전</span></div></div><div className="flex gap-4 rounded-2xl bg-white p-4 shadow-sm border border-purple-50"><div className="flex-shrink-0 mt-1 text-purple-500"><Zap size={20} /></div><div><h4 className="font-bold text-gray-900 text-sm mb-1">실시간 트렌드 🔥</h4><p className="text-xs text-gray-600 leading-relaxed">지금 유튜브에서 '탕후루' 챌린지가 다시 뜨고 있습니다! 탑승하시겠습니까?</p><span className="text-[10px] text-gray-400 mt-2 block">5시간 전</span></div></div></div></motion.div>)}
 
