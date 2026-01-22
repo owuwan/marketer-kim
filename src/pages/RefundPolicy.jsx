@@ -32,9 +32,14 @@ const RefundPolicy = ({ onBack }) => {
             <CheckCircle2 size={18} className="text-blue-500"/> 100% 환불이 가능한 경우
           </h3>
           <ul className="list-disc pl-5 space-y-2 text-xs text-gray-600">
+            <li>포인트 구매 이후 환불은 결제가 되었던 수단으로 진행됩니다.</li>
+            <li>구매한 포인트는 회원간 양도가 불가합니다.</li>
+            <li>구매한 포인트를 사용 및 취소/환불할 수 있는 기한은 <strong>1년</strong>입니다.</li>
             <li>결제 후 <strong>7일 이내</strong>이며, 콘텐츠 생성 이력이 <strong>0건</strong>인 경우</li>
             <li>회사의 귀책사유(시스템 치명적 오류, 24시간 이상 서버 다운 등)로 인해 정상적인 서비스 이용이 불가능했던 경우</li>
             <li>중복 결제가 발생한 경우 (증빙 자료 제출 시)</li>
+            <li>마케터김과장의 환불 정책은 서비스이용약관에 따라 결제 후 <strong>7일</strong> 이내 사용 이력이 없을 시에만 가능합니다.</li>
+            <li>환불 문의는 마이페이지 → 결제 정보 → 결제 내역의 우측 <strong>환불 문의</strong>를 통해 접수할 수 있습니다. 접수된 문의에 대한 답변은 MY문의에서 확인하실 수 있습니다.</li>
           </ul>
         </section>
 
