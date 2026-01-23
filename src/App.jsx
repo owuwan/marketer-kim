@@ -211,24 +211,25 @@ function App() {
     alert("로그아웃 되었습니다.");
   };
 
-  // --- [NEW] 토스 결제 핸들러 ---
+  // --- [NEW] 토스 결제 핸들러 (수정됨: Billing Auth 정기구독) ---
   const handlePayment = async () => {
     try {
       const clientKey = "test_ck_ZLKGPx4M3Mq5qLeqWEXe3BaWypv1"; 
       const tossPayments = await loadTossPayments(clientKey);
        
-      await tossPayments.requestPayment('카드', {
-        amount: 50000,
-        orderId: `ORD-${Date.now()}`,
-        orderName: "마케터 김과장 Pro (월간 구독)",
+      // [수정 포인트] requestPayment -> requestBillingAuth로 변경
+      // 1. amount, orderId 제거
+      // 2. customerKey, successUrl, failUrl 필수 값 전달
+      await tossPayments.requestBillingAuth('카드', {
+        customerKey: `CUST-${Date.now()}`, // 고객 식별을 위한 유니크 키 (실무에선 DB의 유저 ID 사용)
         successUrl: window.location.href,
         failUrl: window.location.href,
       })
       .catch((error) => {
         if (error.code === 'USER_CANCEL') {
-          alert("결제가 취소되었습니다.");
+          alert("결제(카드 등록)가 취소되었습니다.");
         } else {
-          alert(`결제 실패: ${error.message}`);
+          alert(`카드 등록 실패: ${error.message}`);
         }
       });
 
@@ -240,16 +241,19 @@ function App() {
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
-    const paymentKey = urlParams.get('paymentKey');
+    
+    // [수정 포인트] paymentKey -> authKey 수신
+    const authKey = urlParams.get('authKey');
     const code = urlParams.get('code');
 
-    if (paymentKey) {
-      alert("결제 성공! Pro 등급으로 전환됩니다. 🎉");
+    if (authKey) {
+      console.log("✅ 빌링키 발급 인증키(authKey):", authKey); // 서버 전송용 키 출력
+      alert("카드 등록 완료! 정기 구독이 시작됩니다. 🎉");
       setIsPro(true);
       setCurrentScreen('home'); 
       window.history.replaceState({}, document.title, window.location.pathname);
     } else if (code) {
-      alert(`결제 실패 또는 취소되었습니다. (코드: ${code})`);
+      alert(`카드 등록 실패 또는 취소되었습니다. (코드: ${code})`);
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, []);
@@ -294,9 +298,7 @@ function App() {
     } catch (error) {
         console.error("API Error (Fallback Activated):", error);
         
-        // [수정 1] 에러 은폐 및 더미 데이터 주입
         // 서버 연결 실패 시, alert 없이 성공적인 가짜 데이터를 생성해 보여줍니다.
-        
         let dummyContent = "";
         
         if (isManager) {
@@ -307,11 +309,10 @@ function App() {
 
         setGeneratedContent(dummyContent);
         
-        // [수정 3] 강제 화면 전환
         // 에러 알림 대신 자연스럽게 결과 화면으로 이동
         setTimeout(() => {
             setCurrentScreen('result');
-        }, 1500); // 1.5초 정도 로딩하는 척 연출
+        }, 1500); 
     }
   };
 
